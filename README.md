@@ -1,6 +1,6 @@
 # women
 
-Send iMessages to all the women in your macOS contacts.
+identify and interact with the women
 
 ## Install
 
@@ -23,7 +23,7 @@ women
 women --live
 
 # Send a custom message
-women "Happy International Women's Day!" --live
+women "wowie" --live
 
 # Exclude specific contacts (one full name per line)
 women --exclude exclude.txt --live
