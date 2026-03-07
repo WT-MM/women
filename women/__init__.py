@@ -1,3 +1,3 @@
 """Automatically talk to women."""
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
