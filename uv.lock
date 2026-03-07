@@ -12,6 +12,15 @@ wheels = [
 ]
 
 [[package]]
+name = "gender-guesser"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/dc/69939b7af56b7adf3aa2736771b7c3e7191f7cd36fbc80b0727570c275fa/gender-guesser-0.4.0.tar.gz", hash = "sha256:1591c14592805ca7da06a46d5f7202511f7cb87547049a68dfccbeedb879f31b", size = 337238, upload-time = "2016-12-05T11:41:44.554Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/fb/3f2aac40cd2421e164cab1668e0ca10685fcf896bd6b3671088f8aab356e/gender_guesser-0.4.0-py2.py3-none-any.whl", hash = "sha256:7cb01ce5d8d43b94573498bc02c959b622872abd399622ca67d1b73ba6e7e222", size = 379297, upload-time = "2016-12-05T11:41:47.759Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -230,6 +239,9 @@ wheels = [
 [[package]]
 name = "women"
 source = { editable = "." }
+dependencies = [
+    { name = "gender-guesser" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -240,6 +252,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "gender-guesser" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },

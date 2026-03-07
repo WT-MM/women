@@ -9,7 +9,14 @@ license = "MIT"
 readme = "README.md"
 requires-python = ">= 3.11"
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+    "gender-guesser",
+]
+
+[project.scripts]
+
+women = "women.cli:main"
+"women.contacts" = "women.contacts:main"
 
 [project.urls]
 
