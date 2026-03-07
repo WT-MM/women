@@ -1,9 +1,14 @@
 # women
 
-identify and interact with the women
+identify and interact with women
 
 ## Install
 
+```bash
+pip install women
+```
+
+or install from source:
 ```bash
 git clone https://github.com/WT-MM/women.git
 cd women
