@@ -74,3 +74,37 @@ def main() -> None:
         print(f"{name:<{name_width}}  {c['phone']:<16}  {label_map[c['gender']]}")
 
     log.info("%d contacts", len(contacts))
+
+
+def dump() -> None:
+    """Dump all women contacts into an exclude file (one name per line)."""
+    if sys.platform != "darwin":
+        log.error("This tool only works on macOS.")
+        sys.exit(1)
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Dump women contacts into an exclude file.")
+    parser.add_argument("output", nargs="?", default="exclude.txt", help="Output file path (default: exclude.txt).")
+    args = parser.parse_args()
+
+    log.info("Reading contacts...")
+    all_contacts = get_contacts()
+    if not all_contacts:
+        log.warning("No contacts found.")
+        return
+
+    detector = gender.Detector()
+    names: list[str] = []
+    for c in all_contacts:
+        guess = detector.get_gender(c["first_name"])
+        if guess in ("female", "mostly_female", "andy"):
+            names.append(f"{c['first_name']} {c['last_name']}")
+
+    names.sort(key=str.lower)
+
+    with open(args.output, "w") as f:
+        for name in names:
+            f.write(name + "\n")
+
+    log.info("Wrote %d names to %s", len(names), args.output)

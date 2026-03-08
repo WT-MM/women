@@ -2,12 +2,15 @@
 
 import argparse
 import sys
+from datetime import datetime
 
 import gender_guesser.detector as gender
 
 from women.contacts import get_contacts
 from women.logger import get_logger
 from women.messenger import send_imessage
+from women.scheduler import schedule
+from women.watcher import start as start_watcher
 
 log = get_logger()
 
@@ -69,6 +72,8 @@ def main() -> None:
     parser.add_argument("message", nargs="?", default="\U0001f4aa\U0001f478", help="The message to send.")
     parser.add_argument("--exclude", help="Path to a file with names to exclude (one per line).")
     parser.add_argument("--live", action="store_true", help="Actually send messages (default is dry run).")
+    parser.add_argument("--schedule", metavar="DATETIME", help='Schedule send for later (e.g. "2026-03-14 09:00").')
+    parser.add_argument("--reply", metavar="MESSAGE", help="Auto-reply to first response from each contact.")
     args = parser.parse_args()
 
     exclude = load_exclude_list(args.exclude) if args.exclude else set()
@@ -91,6 +96,19 @@ def main() -> None:
     for c in women:
         log.info("  %s %s (%s)", c["first_name"], c["last_name"], c["phone"])
 
+    if args.schedule:
+        try:
+            dt = datetime.strptime(args.schedule, "%Y-%m-%d %H:%M")
+        except ValueError:
+            log.error('Invalid datetime format. Use "YYYY-MM-DD HH:MM".')
+            sys.exit(1)
+        if dt <= datetime.now():
+            log.error("Scheduled time must be in the future.")
+            sys.exit(1)
+        job_id = schedule(women, args.message, dt, reply_message=args.reply)
+        log.info("Use `women.jobs` to view or `women.cancel %s` to cancel.", job_id)
+        return
+
     if not args.live:
         log.warning("Dry run - no messages sent. Use --live to send.")
         return
@@ -109,3 +127,10 @@ def main() -> None:
             log.error("Failed to send to %s: %s", name, e)
 
     log.info("Done!")
+
+    if args.reply:
+        import uuid
+
+        job_id = uuid.uuid4().hex[:8]
+        start_watcher(job_id, women, args.reply)
+        log.info("Watching for replies. Use `women.jobs` to check status.")
