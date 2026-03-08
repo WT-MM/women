@@ -1,5 +1,6 @@
 """Read contacts from the macOS Contacts app via AppleScript."""
 
+import argparse
 import subprocess
 import sys
 
@@ -37,11 +38,86 @@ def get_contacts() -> list[dict[str, str]]:
     return contacts
 
 
+def load_name_list(path: str) -> set[str]:
+    """Load a set of names from a file (one full name per line)."""
+    try:
+        with open(path) as f:
+            names = {line.strip().lower() for line in f if line.strip()}
+            log.info("Loaded %d names from %s", len(names), path)
+            return names
+    except FileNotFoundError:
+        log.error("File not found: %s", path)
+        sys.exit(1)
+
+
+def classify_contacts(
+    contacts: list[dict[str, str]],
+    exclude: set[str] | None = None,
+    include: set[str] | None = None,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Split contacts into confirmed women and ambiguous ones.
+
+    Args:
+        contacts: Raw contact list.
+        exclude: Names to skip entirely.
+        include: Names to always include, bypassing gender detection.
+    """
+    detector = gender.Detector()
+    women: list[dict[str, str]] = []
+    ambiguous: list[dict[str, str]] = []
+
+    for contact in contacts:
+        full_name = f"{contact['first_name']} {contact['last_name']}".lower()
+        if exclude and full_name in exclude:
+            log.debug("Excluding %s", full_name)
+            continue
+
+        guess = detector.get_gender(contact["first_name"])
+        if guess == "female" or (include and full_name in include):
+            women.append(contact)
+        elif guess in ("mostly_female", "andy"):
+            ambiguous.append(contact)
+
+    log.info("Classified %d female, %d ambiguous", len(women), len(ambiguous))
+    return women, ambiguous
+
+
+def resolve_ambiguous(ambiguous: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Ask the user about ambiguous contacts."""
+    resolved: list[dict[str, str]] = []
+    for contact in ambiguous:
+        name = f"{contact['first_name']} {contact['last_name']}"
+        answer = input(f"Is '{name}' a woman? [y/N]: ").strip().lower()
+        if answer == "y":
+            resolved.append(contact)
+    return resolved
+
+
+def add_filter_args(parser: argparse.ArgumentParser) -> None:
+    """Add --exclude and --include arguments to a parser."""
+    parser.add_argument("--exclude", help="Path to a file with names to exclude (one per line).")
+    parser.add_argument(
+        "--include", help="Path to a file with names to always include, bypassing gender detection (one per line)."
+    )
+
+
+def load_filters(args: argparse.Namespace) -> tuple[set[str] | None, set[str] | None]:
+    """Load exclude and include sets from parsed args."""
+    exclude = load_name_list(args.exclude) if args.exclude else None
+    include = load_name_list(args.include) if args.include else None
+    return exclude, include
+
+
 def main() -> None:
     """Print women contacts in a formatted table."""
     if sys.platform != "darwin":
         log.error("This tool only works on macOS.")
         sys.exit(1)
+
+    parser = argparse.ArgumentParser(description="List women in your contacts.")
+    add_filter_args(parser)
+    args = parser.parse_args()
+    exclude, include = load_filters(args)
 
     log.info("Reading contacts...")
     all_contacts = get_contacts()
@@ -49,17 +125,17 @@ def main() -> None:
         log.warning("No contacts found.")
         return
 
-    detector = gender.Detector()
-    contacts = []
-    for c in all_contacts:
-        guess = detector.get_gender(c["first_name"])
-        if guess in ("female", "mostly_female", "andy"):
-            c["gender"] = guess
-            contacts.append(c)
+    women, ambiguous = classify_contacts(all_contacts, exclude=exclude, include=include)
+    contacts = women + ambiguous
 
     if not contacts:
         log.warning("No women contacts found.")
         return
+
+    # Tag gender for display
+    detector = gender.Detector()
+    for c in contacts:
+        c["gender"] = detector.get_gender(c["first_name"])
 
     contacts.sort(key=lambda c: (c["last_name"].lower(), c["first_name"].lower()))
 
@@ -71,7 +147,7 @@ def main() -> None:
     print(f"{'─' * name_width}  {'─' * 16}  {'─' * 13}")
     for c in contacts:
         name = f"{c['first_name']} {c['last_name']}"
-        print(f"{name:<{name_width}}  {c['phone']:<16}  {label_map[c['gender']]}")
+        print(f"{name:<{name_width}}  {c['phone']:<16}  {label_map.get(c['gender'], c['gender'])}")
 
     log.info("%d contacts", len(contacts))
 
@@ -82,11 +158,12 @@ def dump() -> None:
         log.error("This tool only works on macOS.")
         sys.exit(1)
 
-    import argparse
-
     parser = argparse.ArgumentParser(description="Dump women contacts into an exclude file.")
     parser.add_argument("output", nargs="?", default="exclude.txt", help="Output file path (default: exclude.txt).")
+    parser.add_argument("--all", action="store_true", help="Dump all contacts.")
+    add_filter_args(parser)
     args = parser.parse_args()
+    exclude, include = load_filters(args)
 
     log.info("Reading contacts...")
     all_contacts = get_contacts()
@@ -94,13 +171,17 @@ def dump() -> None:
         log.warning("No contacts found.")
         return
 
-    detector = gender.Detector()
-    names: list[str] = []
-    for c in all_contacts:
-        guess = detector.get_gender(c["first_name"])
-        if guess in ("female", "mostly_female", "andy"):
-            names.append(f"{c['first_name']} {c['last_name']}")
+    if args.all:
+        contacts = all_contacts
+        if exclude:
+            contacts = [c for c in contacts if f"{c['first_name']} {c['last_name']}".lower() not in exclude]
+        if include:
+            contacts = [c for c in contacts if f"{c['first_name']} {c['last_name']}".lower() in include]
+    else:
+        women, ambiguous = classify_contacts(all_contacts, exclude=exclude, include=include)
+        contacts = women + ambiguous
 
+    names = [f"{c['first_name']} {c['last_name']}" for c in contacts]
     names.sort(key=str.lower)
 
     with open(args.output, "w") as f:

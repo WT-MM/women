@@ -18,6 +18,7 @@ dependencies = [
 women = "women.cli:main"
 "women.contacts" = "women.contacts:main"
 "women.dump" = "women.contacts:dump"
+"women.reply" = "women.cli:reply_main"
 "women.jobs" = "women.scheduler:jobs_main"
 "women.cancel" = "women.scheduler:cancel_main"
 
